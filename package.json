@@ -1,0 +1,30 @@
+{
+  "name": "mcp-browse",
+  "version": "0.1.0",
+  "description": "Lightweight MCP server for DNS-based agent service discovery over UDP. No registry needed.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "mcp",
+    "dns",
+    "service-discovery",
+    "udp",
+    "model-context-protocol",
+    "agent"
+  ],
+  "author": "kormco",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  }
+}
