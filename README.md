@@ -14,7 +14,7 @@ Once connected, the agent calls the `browse_domain` tool with a domain name. mcp
 
 ```
 Agent  →  mcp-browse (MCP server)  →  UDP DNS query for _mcp.example.com TXT
-                                    ←  "v=mcp1; endpoint=https://mcp.example.com; ..."
+                                    ←  "v=mcp1; src=https://mcp.example.com; ..."
        ←  Structured JSON response
 ```
 
@@ -27,7 +27,7 @@ No HTTP registry in the loop. The DNS infrastructure **is** the registry.
 - **mcp-browse is a standard MCP server** — any MCP-compliant agent can use it with zero new client code. It's just another server in your agent's config.
 - **Supports the `_mcp` TXT record convention** — records follow a semicolon-delimited format:
   ```
-  v=mcp1; endpoint=https://mcp.example.com; public=true; auth=oauth2; version=2024.1
+  v=mcp1; src=https://mcp.example.com; public=true; auth=oauth2; version=2024.1
   ```
 - **Works with split-horizon DNS** — enterprise and private networks can publish internal `_mcp` records visible only inside their network, enabling private service discovery without exposing anything to the public internet.
 
@@ -46,7 +46,7 @@ Lookup `_mcp.{domain}` TXT records and return a parsed list of discovered MCP se
 }
 ```
 
-Returns structured server metadata: endpoint URL, protocol version, auth requirements, visibility, and any additional fields published in the TXT record.
+Returns structured server metadata: server URL, protocol version, auth requirements, and any additional fields published in the TXT record.
 
 ### `browse_server`
 
@@ -74,9 +74,24 @@ Batch lookup across multiple domains in a single call. Useful for scanning a lis
 }
 ```
 
+### `call_remote_tool`
+
+Call a tool on a remote MCP server. Use `browse_server` first to discover available tools, then use this to execute them. Handles the JSON-RPC initialize handshake and `tools/call` request.
+
+```json
+{
+  "tool": "call_remote_tool",
+  "arguments": {
+    "url": "https://mcp.example.com",
+    "tool": "list_articles",
+    "arguments": { "limit": 5 }
+  }
+}
+```
+
 ## Status
 
-**Early proposal / RFC stage.** This repo captures the concept, intended interface, and design rationale. Implementation is in progress.
+**Working.** The server implements DNS-based discovery, server inspection, and remote tool calling over the Streamable HTTP transport.
 
 Feedback, criticism, and alternative approaches are welcome — open an issue or start a discussion.
 
