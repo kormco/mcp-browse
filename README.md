@@ -89,6 +89,16 @@ Call a tool on a remote MCP server. Use `browse_server` first to discover availa
 }
 ```
 
+## Try It
+
+**[korm.co](https://korm.co)** publishes a live `_mcp` TXT record. You can discover and interact with it end-to-end:
+
+```
+browse_domain("korm.co")        → discovers MCP server at https://mcp.korm.co
+browse_server("https://mcp.korm.co")  → lists available tools (list_articles, get_article, get_author_info)
+call_remote_tool("https://mcp.korm.co", "list_articles")  → returns blog articles
+```
+
 ## Status
 
 **Working.** The server implements DNS-based discovery, server inspection, and remote tool calling over the Streamable HTTP transport.
