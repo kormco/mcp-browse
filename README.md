@@ -179,7 +179,7 @@ Feedback, criticism, and alternative approaches are welcome — open an issue or
 
 ## Related
 
-- [Model Context Protocol Specification](https://spec.modelcontextprotocol.io)
+- [Model Context Protocol Specification](https://modelcontextprotocol.io/specification)
 - [DNS TXT records for organisation-scoped registry discovery](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2334) — Discussion #2334
 - [DNS-native MCP discovery: a zero-infrastructure alternative](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2368) — Discussion #2368
 - [SEP-2127: MCP Server Cards — HTTP Server Discovery via .well-known](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127)
