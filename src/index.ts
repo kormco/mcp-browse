@@ -81,11 +81,17 @@ async function inspectMcpServer(url: string): Promise<any> {
   }
 
   const initResult = await initResponse.json();
+  const sessionId = initResponse.headers.get("mcp-session-id");
+
+  const sessionHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionId) {
+    sessionHeaders["mcp-session-id"] = sessionId;
+  }
 
   const jsonRpcPost = (id: number, method: string) =>
     fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: sessionHeaders,
       body: JSON.stringify({ jsonrpc: "2.0", id, method, params: {} }),
     }).then(async (r) => (r.ok ? (await r.json()).result : null));
 
@@ -126,7 +132,7 @@ async function discoverMcpDomain(domain: string): Promise<any> {
 }
 
 // --- Remote Server Helpers ---
-async function initRemoteServer(url: string): Promise<void> {
+async function initRemoteServer(url: string): Promise<string | null> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -145,12 +151,19 @@ async function initRemoteServer(url: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`Server returned ${response.status} during initialization`);
   }
+
+  return response.headers.get("mcp-session-id");
 }
 
-async function jsonRpcCall(url: string, id: number, method: string, params: Record<string, unknown>): Promise<any> {
+async function jsonRpcCall(url: string, id: number, method: string, params: Record<string, unknown>, sessionId?: string | null): Promise<any> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (sessionId) {
+    headers["mcp-session-id"] = sessionId;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
   });
 
@@ -173,14 +186,14 @@ async function callRemoteTool(
   toolName: string,
   toolArgs: Record<string, unknown> = {}
 ): Promise<any> {
-  await initRemoteServer(url);
-  return jsonRpcCall(url, 2, "tools/call", { name: toolName, arguments: toolArgs });
+  const sessionId = await initRemoteServer(url);
+  return jsonRpcCall(url, 2, "tools/call", { name: toolName, arguments: toolArgs }, sessionId);
 }
 
 // --- Remote Resource Reading ---
 async function readRemoteResource(url: string, uri: string): Promise<any> {
-  await initRemoteServer(url);
-  return jsonRpcCall(url, 2, "resources/read", { uri });
+  const sessionId = await initRemoteServer(url);
+  return jsonRpcCall(url, 2, "resources/read", { uri }, sessionId);
 }
 
 // --- Remote Prompt Getting ---
@@ -189,8 +202,8 @@ async function getRemotePrompt(
   promptName: string,
   promptArgs: Record<string, string> = {}
 ): Promise<any> {
-  await initRemoteServer(url);
-  return jsonRpcCall(url, 2, "prompts/get", { name: promptName, arguments: promptArgs });
+  const sessionId = await initRemoteServer(url);
+  return jsonRpcCall(url, 2, "prompts/get", { name: promptName, arguments: promptArgs }, sessionId);
 }
 
 // --- Response Formatting ---
