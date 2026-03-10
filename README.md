@@ -1,5 +1,10 @@
 # mcp-www
 
+[![npm version](https://img.shields.io/npm/v/mcp-www)](https://www.npmjs.com/package/mcp-www)
+[![npm downloads](https://img.shields.io/npm/dm/mcp-www)](https://www.npmjs.com/package/mcp-www)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+
 **DNS-based MCP service discovery over UDP.**
 
 ## Problem
