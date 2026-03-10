@@ -54,7 +54,7 @@ Add to your MCP client config (e.g., `.mcp.json`):
 
 ## Try It
 
-🤖 Use your agent for easy mcp-www installation or follow the manual steps above.  Simply ask it to install mcp-www from npm (many clients require a restart for a new server.)
+🤖 Use your agent for easy `mcp-www` installation or follow the manual steps above.  Simply ask it to install mcp-www from npm (many clients require a restart for a new server.)
 
 🚀 **Publish your own MCP server via _dns TXT record** - or -
 
