@@ -17,6 +17,64 @@ import { promisify } from "node:util";
 
 const resolveTxt = promisify(dns.resolveTxt);
 
+// --- IDN Homograph Detection ---
+function detectHomograph(domain: string): string | null {
+  const labels = domain.split(".");
+
+  // Check for punycode-encoded labels (ACE prefix)
+  const punycodeLabels = labels.filter((l) => l.startsWith("xn--"));
+  if (punycodeLabels.length > 0) {
+    return `Domain contains punycode-encoded label(s): ${punycodeLabels.join(", ")}. This may be an IDN homograph attack — visually similar characters from different scripts (e.g., Cyrillic) can make a domain look identical to a legitimate one.`;
+  }
+
+  // Check for mixed Unicode scripts within a single label
+  // Common confusable scripts: Cyrillic, Greek, Latin
+  for (const label of labels) {
+    let hasLatin = false;
+    let hasNonLatin = false;
+    let detectedScripts: string[] = [];
+
+    for (const char of label) {
+      const code = char.codePointAt(0)!;
+      if (code >= 0x41 && code <= 0x7a) {
+        hasLatin = true;
+      } else if (code >= 0x0400 && code <= 0x04ff) {
+        hasNonLatin = true;
+        if (!detectedScripts.includes("Cyrillic")) detectedScripts.push("Cyrillic");
+      } else if (code >= 0x0370 && code <= 0x03ff) {
+        hasNonLatin = true;
+        if (!detectedScripts.includes("Greek")) detectedScripts.push("Greek");
+      } else if (code >= 0x0100 && code <= 0x024f) {
+        // Latin Extended — not suspicious on its own but flag with others
+      }
+    }
+
+    if (hasLatin && hasNonLatin) {
+      return `Domain label "${label}" mixes Latin with ${detectedScripts.join("/")} characters. This is a strong indicator of an IDN homograph attack.`;
+    }
+
+    // Fully non-Latin label (e.g., all Cyrillic) pretending to be a common domain
+    if (hasNonLatin && !hasLatin && detectedScripts.length > 0) {
+      return `Domain label "${label}" uses ${detectedScripts.join("/")} script characters that may visually mimic Latin characters. Verify this is the intended domain.`;
+    }
+  }
+
+  return null;
+}
+
+function formatHomographWarning(warning: string): { type: string; text: string } {
+  return {
+    type: "text",
+    text: [
+      "////// SECURITY WARNING //////",
+      "IDN HOMOGRAPH ATTACK DETECTED",
+      warning,
+      "DO NOT proceed without verifying this is the intended domain. Ask the user to confirm.",
+      "//////////////////////////////",
+    ].join("\n"),
+  };
+}
+
 // --- TXT Record Parser ---
 function parseMcpTxtRecord(txtRecords: string[][]): Record<string, string> {
   // TXT records come as arrays of strings (chunked), join them
@@ -41,18 +99,22 @@ function parseMcpTxtRecord(txtRecords: string[][]): Record<string, string> {
 }
 
 // --- DNS Lookup ---
-async function lookupMcpDomain(domain: string): Promise<Record<string, string> | null> {
-  const mcpDomain = `_mcp.${domain}`;
+async function lookupMcpDomain(domain: string): Promise<{ record: Record<string, string> | null; homograph_warning?: string }> {
+  // Normalize Unicode and detect homograph attacks
+  const normalized = domain.normalize("NFC");
+  const warning = detectHomograph(normalized);
+
+  const mcpDomain = `_mcp.${normalized}`;
 
   try {
     const records = await resolveTxt(mcpDomain);
     if (records.length === 0) {
-      return null;
+      return { record: null, ...(warning && { homograph_warning: warning }) };
     }
-    return parseMcpTxtRecord(records);
+    return { record: parseMcpTxtRecord(records), ...(warning && { homograph_warning: warning }) };
   } catch (err: any) {
     if (err.code === "ENODATA" || err.code === "ENOTFOUND") {
-      return null; // No TXT record found
+      return { record: null, ...(warning && { homograph_warning: warning }) };
     }
     throw err;
   }
@@ -113,21 +175,23 @@ async function inspectMcpServer(url: string): Promise<any> {
 
 // --- Combined Discovery + Inspection ---
 async function discoverMcpDomain(domain: string): Promise<any> {
-  const record = await lookupMcpDomain(domain);
+  const { record, homograph_warning } = await lookupMcpDomain(domain);
+  const base: any = { domain, ...(homograph_warning && { homograph_warning }) };
+
   if (record === null) {
-    return { domain, found: false, message: `No _mcp.${domain} TXT record found` };
+    return { ...base, found: false, message: `No _mcp.${domain} TXT record found` };
   }
 
   const serverUrl = record.src || record.endpoint;
   if (!serverUrl) {
-    return { domain, found: true, record, server: null, message: "No server URL (src/endpoint) in TXT record" };
+    return { ...base, found: true, record, server: null, message: "No server URL (src/endpoint) in TXT record" };
   }
 
   try {
     const serverInfo = await inspectMcpServer(serverUrl);
-    return { domain, found: true, record, server: { url: serverUrl, ...serverInfo } };
+    return { ...base, found: true, record, server: { url: serverUrl, ...serverInfo } };
   } catch (err: any) {
-    return { domain, found: true, record, server: { url: serverUrl, error: err.message } };
+    return { ...base, found: true, record, server: { url: serverUrl, error: err.message } };
   }
 }
 
@@ -393,11 +457,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const domain = (args as { domain: string }).domain;
 
       try {
-        const result = await lookupMcpDomain(domain);
+        const { record, homograph_warning } = await lookupMcpDomain(domain);
+        const warningBlock = homograph_warning ? [formatHomographWarning(homograph_warning)] : [];
 
-        if (result === null) {
+        if (record === null) {
           return {
             content: [
+              ...warningBlock,
               {
                 type: "text",
                 text: JSON.stringify(
@@ -412,9 +478,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [
+            ...warningBlock,
             {
               type: "text",
-              text: JSON.stringify({ domain, found: true, record: result }, null, 2),
+              text: JSON.stringify({ domain, found: true, record }, null, 2),
             },
           ],
         };
@@ -454,20 +521,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const domains = (args as { domains: string[] }).domains;
 
       const results: Record<string, any> = {};
+      const warnings: { domain: string; warning: string }[] = [];
 
       await Promise.all(
         domains.map(async (domain) => {
           try {
-            const record = await lookupMcpDomain(domain);
-            results[domain] = record !== null ? { found: true, record } : { found: false };
+            const { record, homograph_warning } = await lookupMcpDomain(domain);
+            results[domain] = record !== null
+              ? { found: true, record }
+              : { found: false };
+            if (homograph_warning) warnings.push({ domain, warning: homograph_warning });
           } catch (err: any) {
             results[domain] = { error: err.message };
           }
         })
       );
 
+      const warningBlocks = warnings.map((w) =>
+        formatHomographWarning(`[${w.domain}] ${w.warning}`)
+      );
+
       return {
         content: [
+          ...warningBlocks,
           {
             type: "text",
             text: JSON.stringify(results, null, 2),
@@ -481,18 +557,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         const result = await discoverMcpDomain(domain);
+        const warningBlock = result.homograph_warning ? [formatHomographWarning(result.homograph_warning)] : [];
+
         // If we got server data with instructions, surface them prominently
         if (result.server && !result.server.error && result.server.instructions) {
           const content = formatServerResult(result.server, result.server.url);
-          // Prepend the discovery context
+          // Prepend warning + discovery context
           content.unshift({
             type: "text",
             text: `Discovered MCP server for ${domain} via DNS lookup of _mcp.${domain}`,
           });
+          content.unshift(...warningBlock);
           return { content };
         }
         return {
           content: [
+            ...warningBlock,
             {
               type: "text",
               text: JSON.stringify(result, null, 2),
