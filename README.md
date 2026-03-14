@@ -19,7 +19,7 @@ Once connected, the agent calls `discover` with a domain name. mcp-www performs 
 
 ```
 Agent  →  mcp-www  →  discover("example.com")  →  DNS TXT lookup
-                   →  browse("example.com")     →  parallel server card + MCP handshake
+                   →  browse("example.com")     →  server card GET with MCP handshake fallback
                    →  install("example.com")    →  config for Claude Desktop / VS Code / Cursor / Windsurf
 ```
 
