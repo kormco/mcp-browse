@@ -192,6 +192,7 @@ When detected, a prominent warning is surfaced as a separate content block, inst
 
 ## Related
 
+- [In-Process Benchmarks](https://github.com/kormco/mcp-www-benchmark/blob/master/results/report/report.md)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/specification)
 - [DNS TXT records for organisation-scoped registry discovery](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2334) — Discussion #2334
 - [DNS-native MCP discovery: a zero-infrastructure alternative](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2368) — Discussion #2368
